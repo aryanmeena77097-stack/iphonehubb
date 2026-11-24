@@ -8,7 +8,6 @@ export async function POST(request) {
   try {
     const { phone, amount } = await request.json();
 
-    // Validate mobile number
     if (!/^[6-9]\d{9}$/.test(phone || "")) {
       return NextResponse.json(
         { error: "Invalid mobile number." },
@@ -16,12 +15,11 @@ export async function POST(request) {
       );
     }
 
-    // Validate amount
     const paymentAmount = Number(amount);
 
     if (
       !Number.isFinite(paymentAmount) ||
-      paymentAmount <= 0 ||
+      paymentAmount < 1 ||
       paymentAmount > 1000000
     ) {
       return NextResponse.json(
@@ -35,15 +33,13 @@ export async function POST(request) {
 
     if (!apiKey || !apiSecret) {
       return NextResponse.json(
-        { error: "Payment gateway is not configured." },
+        { error: "Payment API credentials are missing." },
         { status: 500 }
       );
     }
 
-    // Create unique order ID
     const orderId = "ORD-" + randomUUID();
 
-    // Exact JSON body used for signing
     const body = JSON.stringify({
       order_id: orderId,
       amount: paymentAmount,
@@ -52,12 +48,10 @@ export async function POST(request) {
       customer_phone: phone
     });
 
-    // HMAC SHA256 signature
     const signature = createHmac("sha256", apiSecret)
       .update(body, "utf8")
       .digest("hex");
 
-    // Call SunPay API
     const response = await fetch(
       "https://ttpay.buzz/api/public/v1/payins",
       {
@@ -75,20 +69,18 @@ export async function POST(request) {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("SunPay API error:", response.status);
+      console.error("SunPay response status:", response.status);
+
       return NextResponse.json(
         { error: "Payment gateway rejected the request." },
         { status: 502 }
       );
     }
 
-    // Accept only the documented checkout host
-    const checkoutUrl = data.checkout_url;
-
-    let parsedUrl;
+    let checkout;
 
     try {
-      parsedUrl = new URL(checkoutUrl);
+      checkout = new URL(data.checkout_url);
     } catch {
       return NextResponse.json(
         { error: "Invalid checkout URL received." },
@@ -97,8 +89,8 @@ export async function POST(request) {
     }
 
     if (
-      parsedUrl.protocol !== "https:" ||
-      parsedUrl.hostname !== "ttpay.buzz"
+      checkout.protocol !== "https:" ||
+      checkout.hostname !== "ttpay.buzz"
     ) {
       return NextResponse.json(
         { error: "Untrusted checkout URL." },
@@ -108,12 +100,12 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      checkout_url: parsedUrl.toString(),
+      checkout_url: checkout.toString(),
       order_id: orderId
     });
 
   } catch (error) {
-    console.error("Payment creation error:", error);
+    console.error("Payment error:", error);
 
     return NextResponse.json(
       { error: "Unable to create payment. Please try again." },
@@ -121,4 +113,3 @@ export async function POST(request) {
     );
   }
 }
-
