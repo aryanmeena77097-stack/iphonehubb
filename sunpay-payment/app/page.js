@@ -9,7 +9,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function handlePayment(e) {
+  async function payNow(e) {
     e.preventDefault();
     setError("");
 
@@ -18,40 +18,41 @@ export default function Home() {
       return;
     }
 
-    const paymentAmount = Number(amount);
+    const value = Number(amount);
 
-    if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
-      setError("Please enter a valid payment amount.");
+    if (!Number.isFinite(value) || value < 1 || value > 1000000) {
+      setError("Please enter a valid amount.");
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await fetch("/api/create-payment", {
+      const res = await fetch("/api/create-payment", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           phone,
-          amount: paymentAmount,
-        }),
+          amount: value
+        })
       });
 
-      const data = await response.json();
+      const data = await res.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "Payment could not be created.");
+      if (!res.ok) {
+        throw new Error(data.error || "Payment request failed.");
       }
 
       if (!data.checkout_url) {
-        throw new Error("Checkout URL was not received.");
+        throw new Error("Checkout URL not received.");
       }
 
-      window.location.assign(data.checkout_url);
+      window.location.href = data.checkout_url;
+
     } catch (err) {
-      setError(err.message || "Something went wrong.");
+      setError(err.message);
       setLoading(false);
     }
   }
@@ -62,9 +63,7 @@ export default function Home() {
 
         <div className="shield">✓</div>
 
-        <div className="secure-label">
-          SAFE & SECURE
-        </div>
+        <div className="safe">SAFE & SECURE</div>
 
         <h1>Secure Payment</h1>
 
@@ -72,36 +71,32 @@ export default function Home() {
           Fast, Simple & Secure Online Payments
         </p>
 
-        <form onSubmit={handlePayment}>
+        <form onSubmit={payNow}>
 
-          <label htmlFor="phone">
-            Enter Number
-          </label>
+          <label>Enter Number</label>
 
           <input
-            id="phone"
             type="tel"
             inputMode="numeric"
             placeholder="Enter 10-digit mobile number"
             value={phone}
             onChange={(e) =>
-              setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
+              setPhone(
+                e.target.value.replace(/\D/g, "").slice(0, 10)
+              )
             }
-            maxLength={10}
             required
           />
 
-          <label htmlFor="amount">
-            Enter Amount (INR)
-          </label>
+          <label>Enter Amount</label>
 
-          <div className="amount-input">
+          <div className="amount-box">
             <span>₹</span>
             <input
-              id="amount"
               type="number"
-              placeholder="Enter payment amount"
+              placeholder="Enter amount"
               min="1"
+              max="1000000"
               step="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -110,9 +105,7 @@ export default function Home() {
           </div>
 
           {error && (
-            <div className="error">
-              {error}
-            </div>
+            <p className="error">{error}</p>
           )}
 
           <button type="submit" disabled={loading}>
@@ -121,9 +114,9 @@ export default function Home() {
 
         </form>
 
-        <div className="payment-footer">
+        <div className="footer">
           <span>🔒 Secure Checkout</span>
-          <span>UPI Payments</span>
+          <span>UPI Payment</span>
         </div>
 
         <p className="powered">
